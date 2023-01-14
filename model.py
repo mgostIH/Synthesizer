@@ -27,8 +27,8 @@ class SynthesizerLayer(nn.Module):
         self.K = _K
 
 
-        self.W_Q_1 = nn.Parameter(torch.empty((H, D//H, D//H)))
-        self.W_Q_2 = nn.Parameter(torch.empty((H, M, D//H)))
+        self.W_Q_1 = nn.Parameter(torch.empty((H, N, D//H, D//H)))
+        self.W_Q_2 = nn.Parameter(torch.empty((H, N, M, D//H)))
         self.activation = nn.GELU()
 
         self.W_V = nn.Parameter(torch.empty((H, F//H, F//H)))
@@ -53,18 +53,18 @@ class SynthesizerLayer(nn.Module):
         V = V.view(B, M, H, F_H)
 
         # X : (B, N, H, D_H)
-        # W_Q_1 : (H, D_H, D_H)
+        # W_Q_1 : (H, N, D_H, D_H)
         # Output: (B, H, N, D_H)
-        Q_1 = torch.einsum('bnhd,hdd->bhnd', X, self.W_Q_1)
+        Q_1 = torch.einsum('bnhd,hndd->bhnd', X, self.W_Q_1)
         # Activation
         Q_1 = self.activation(Q_1)
 
         # Now we obtain an NxM matrix for each head, where M is the amount of values
         # We softmax this on the rows and then compute the values
         # Q_1 : (B, H, N, D_H)
-        # W_Q_2 : (H, M, D_H)
+        # W_Q_2 : (H, N, M, D_H)
         # Output: (B, H, N, N)
-        Q_2 = torch.einsum('bhnd,hmd->bhnm', Q_1, self.W_Q_2)
+        Q_2 = torch.einsum('bhnd,hnmd->bhnm', Q_1, self.W_Q_2)
 
         # Masking
         if mask is not None:
@@ -84,5 +84,4 @@ class SynthesizerLayer(nn.Module):
         return self.O(Y)
 
 
-        
 
