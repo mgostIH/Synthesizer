@@ -84,4 +84,23 @@ class SynthesizerLayer(nn.Module):
         return self.O(Y)
 
 
+# Uses the equivalent of self-attention, so V = X, N = M, D = F, K is unused
+# We use pre-normalization for X
+class Synthesizer(nn.Module):
+    def __init__(self, N, D, heads, _K, layers, mask = None) -> None:
+        super().__init__()
+        self.N = N
+        self.D = D
+        self.H = heads
+        self.K = _K
+        self.layers = layers
+        self.mask = mask
 
+        self.layers = nn.ModuleList([SynthesizerLayer(N, N, D, D, heads, _K) for _ in range(layers)])
+        self.layer_norm = nn.LayerNorm(D)
+
+    def forward(self, X):
+        for layer in self.layers:
+            X_norm = self.layer_norm(X)
+            X = X + layer(X_norm, X_norm, self.mask)
+        return X
