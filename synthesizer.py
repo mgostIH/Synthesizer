@@ -80,14 +80,14 @@ class SynthesizerLayer(nn.Module):
         Y = torch.einsum('bhnm,bmhf,hff->bnhf', Q_2, V, self.W_V)
 
         # Recombine heads
-        Y = Y.view(B, N, F)
+        Y = Y.reshape(B, N, F)
         return self.O(Y)
 
 
 # Uses the equivalent of self-attention, so V = X, N = M, D = F, K is unused
 # We use pre-normalization for X
 class Synthesizer(nn.Module):
-    def __init__(self, N, D, heads, _K, layers, mask = None) -> None:
+    def __init__(self, N, D, heads, tokens, layers, mask = None, _K = None) -> None:
         super().__init__()
         self.N = N
         self.D = D
@@ -95,11 +95,21 @@ class Synthesizer(nn.Module):
         self.K = _K
         self.layers = layers
         self.mask = mask
+        
+        self.embedding = nn.Embedding(tokens, D)
 
         self.layers = nn.ModuleList([SynthesizerLayer(N, N, D, D, heads, _K) for _ in range(layers)])
         self.layer_norm = nn.LayerNorm(D)
 
     def forward(self, X):
+        # X : (B, N)
+        X = self.embedding(X)
+        # Replace a few dimensions with uniformly drawn random numbers
+        X[:, :, 0] = torch.rand(X.shape[0], X.shape[1])
+        X[:, :, 1] = torch.rand(X.shape[0], X.shape[1])
+        X[:, :, -1] = torch.rand(X.shape[0], X.shape[1])
+        X[:, :, -2] = torch.rand(X.shape[0], X.shape[1])
+
         for layer in self.layers:
             X_norm = self.layer_norm(X)
             X = X + layer(X_norm, X_norm, self.mask)
